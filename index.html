@@ -2,11 +2,162 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Colored Chess Figures</title>
+    <style>
+      body {
+        background: #222;
+        color: white;
+        font-family: Arial;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 20px;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(8, 60px);
+        grid-template-rows: repeat(8, 60px);
+        gap: 0;
+        border: 4px solid #000;
+      }
+
+      .square {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+
+      .white {
+        background: #f0d9b5;
+      }
+      .black {
+        background: #b58863;
+      }
+
+      /* Colored pieces with outline for visibility */
+      .piece-white {
+        color: white;
+        -webkit-text-stroke: 1px black;
+      }
+
+      .piece-black {
+        color: black;
+        -webkit-text-stroke: 1px white;
+      }
+
+      /* Highlight selected square */
+      .selected {
+        outline: 3px solid yellow;
+      }
+
+      #resetBtn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+    </style>
   </head>
+
   <body>
-    <h1>This is my homepage</h1>
-    <footer>&copy;Copyright 2025 Lucas Huang</footer>
+    <h1>Colored Chess Figures</h1>
+
+    <div class="board" id="board"></div>
+    <button id="resetBtn">Reset Game</button>
+
+    <script>
+      const boardElement = document.getElementById("board");
+
+      // Unicode pieces
+      const figures = {
+        P: "♙",
+        R: "♖",
+        N: "♘",
+        B: "♗",
+        Q: "♕",
+        K: "♔",
+        p: "♟",
+        r: "♜",
+        n: "♞",
+        b: "♝",
+        q: "♛",
+        k: "♚",
+      };
+
+      let initialBoard = [
+        ["r", "n", "b", "q", "k", "b", "n", "r"],
+        ["p", "p", "p", "p", "p", "p", "p", "p"],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["P", "P", "P", "P", "P", "P", "P", "P"],
+        ["R", "N", "B", "Q", "K", "B", "N", "R"],
+      ];
+
+      let board = JSON.parse(JSON.stringify(initialBoard));
+      let selected = null;
+
+      function drawBoard() {
+        boardElement.innerHTML = "";
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const square = document.createElement("div");
+            square.classList.add("square");
+            square.classList.add((row + col) % 2 === 0 ? "white" : "black");
+            square.dataset.row = row;
+            square.dataset.col = col;
+
+            const piece = board[row][col];
+            if (piece) {
+              square.textContent = figures[piece];
+              if (piece === piece.toUpperCase()) {
+                square.classList.add("piece-white");
+              } else {
+                square.classList.add("piece-black");
+              }
+            }
+
+            square.addEventListener("click", onSquareClick);
+            if (selected && selected.row == row && selected.col == col)
+              square.classList.add("selected");
+
+            boardElement.appendChild(square);
+          }
+        }
+      }
+
+      function onSquareClick(e) {
+        const row = parseInt(e.target.dataset.row);
+        const col = parseInt(e.target.dataset.col);
+
+        if (selected) {
+          // Move piece / capture
+          board[row][col] = board[selected.row][selected.col];
+          board[selected.row][selected.col] = "";
+          selected = null;
+        } else {
+          if (board[row][col] !== "") {
+            selected = { row, col };
+          }
+        }
+        drawBoard();
+      }
+
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        board = JSON.parse(JSON.stringify(initialBoard));
+        selected = null;
+        drawBoard();
+      });
+
+      drawBoard();
+    </script>
   </body>
 </html>
