@@ -20,6 +20,7 @@
         grid-template-columns: repeat(8, 60px);
         grid-template-rows: repeat(8, 60px);
         border: 4px solid #000;
+        position: relative;
       }
 
       .square {
@@ -36,6 +37,7 @@
       .white {
         background: #f0d9b5;
       }
+
       .black {
         background: #b58863;
       }
@@ -90,6 +92,25 @@
         cursor: pointer;
       }
 
+      /* Promotion UI */
+      .promotion {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #333;
+        padding: 15px;
+        border-radius: 8px;
+        display: none;
+        z-index: 100;
+      }
+
+      .promotion button {
+        font-size: 30px;
+        margin: 5px;
+        cursor: pointer;
+      }
+
       footer {
         margin-top: auto;
         padding: 15px 0;
@@ -105,10 +126,13 @@
     <div class="board" id="board"></div>
     <button id="resetBtn">Reset Game</button>
 
-    <footer>&copy;Copyright 2025 Lucas</footer>
+    <div class="promotion" id="promotion"></div>
+
+    <footer>&copy; Copyright 2025 Lucas</footer>
 
     <script>
       const boardElement = document.getElementById("board");
+      const promotionEl = document.getElementById("promotion");
 
       const figures = {
         P: "♙",
@@ -138,6 +162,7 @@
 
       let board = JSON.parse(JSON.stringify(initialBoard));
       let selected = null;
+      let promotionTarget = null;
 
       function drawBoard() {
         boardElement.innerHTML = "";
@@ -151,40 +176,23 @@
             square.dataset.row = row;
             square.dataset.col = col;
 
-            square.addEventListener("click", () => {
-              if (selected) {
-                board[row][col] = board[selected.row][selected.col];
-                board[selected.row][selected.col] = "";
-                selected = null;
-                drawBoard();
-              } else if (board[row][col]) {
-                selected = { row, col };
-                drawBoard();
-              }
-            });
+            square.onclick = () => handleMove(row, col);
 
-            square.addEventListener("dragover", (e) => {
+            square.ondragover = (e) => {
               e.preventDefault();
               square.classList.add("drag-over");
-            });
+            };
 
-            square.addEventListener("dragleave", () => {
-              square.classList.remove("drag-over");
-            });
+            square.ondragleave = () => square.classList.remove("drag-over");
 
-            square.addEventListener("drop", (e) => {
+            square.ondrop = (e) => {
               e.preventDefault();
               square.classList.remove("drag-over");
-
-              const from = e.dataTransfer.getData("text/plain");
+              const from = e.dataTransfer.getData("text");
               if (!from) return;
-
-              const [fromRow, fromCol] = from.split(",").map(Number);
-              board[row][col] = board[fromRow][fromCol];
-              board[fromRow][fromCol] = "";
-              selected = null;
-              drawBoard();
-            });
+              const [r, c] = from.split(",").map(Number);
+              movePiece(r, c, row, col);
+            };
 
             const piece = board[row][col];
             if (piece) {
@@ -194,11 +202,8 @@
                 "piece " +
                 (piece === piece.toUpperCase() ? "piece-white" : "piece-black");
               pieceEl.draggable = true;
-
-              pieceEl.addEventListener("dragstart", (e) => {
-                e.dataTransfer.setData("text/plain", `${row},${col}`);
-              });
-
+              pieceEl.ondragstart = (e) =>
+                e.dataTransfer.setData("text", `${row},${col}`);
               square.appendChild(pieceEl);
             }
 
@@ -225,11 +230,59 @@
         }
       }
 
-      document.getElementById("resetBtn").addEventListener("click", () => {
+      function handleMove(row, col) {
+        if (selected) {
+          movePiece(selected.row, selected.col, row, col);
+        } else if (board[row][col]) {
+          selected = { row, col };
+          drawBoard();
+        }
+      }
+
+      function movePiece(fr, fc, tr, tc) {
+        board[tr][tc] = board[fr][fc];
+        board[fr][fc] = "";
+        selected = null;
+        checkPromotion(tr, tc);
+        drawBoard();
+      }
+
+      function checkPromotion(row, col) {
+        const p = board[row][col];
+        if ((p === "P" && row === 0) || (p === "p" && row === 7)) {
+          promotionTarget = { row, col, color: p === "P" ? "white" : "black" };
+          showPromotion();
+        }
+      }
+
+      function showPromotion() {
+        promotionEl.innerHTML = "";
+        promotionEl.style.display = "block";
+
+        const pieces =
+          promotionTarget.color === "white"
+            ? ["Q", "R", "B", "N"]
+            : ["q", "r", "b", "n"];
+
+        pieces.forEach((p) => {
+          const btn = document.createElement("button");
+          btn.textContent = figures[p];
+          btn.onclick = () => {
+            board[promotionTarget.row][promotionTarget.col] = p;
+            promotionEl.style.display = "none";
+            promotionTarget = null;
+            drawBoard();
+          };
+          promotionEl.appendChild(btn);
+        });
+      }
+
+      document.getElementById("resetBtn").onclick = () => {
         board = JSON.parse(JSON.stringify(initialBoard));
         selected = null;
+        promotionEl.style.display = "none";
         drawBoard();
-      });
+      };
 
       drawBoard();
     </script>
