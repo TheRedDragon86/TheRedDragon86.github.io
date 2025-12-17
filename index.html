@@ -7,22 +7,19 @@
       body {
         background: #222;
         color: white;
-        font-family: Arial;
+        font-family: Arial, sans-serif;
         display: flex;
         flex-direction: column;
         align-items: center;
         padding-top: 20px;
         min-height: 100vh;
       }
-
       .board {
         display: grid;
         grid-template-columns: repeat(8, 60px);
         grid-template-rows: repeat(8, 60px);
         border: 4px solid #000;
-        position: relative;
       }
-
       .square {
         width: 60px;
         height: 60px;
@@ -33,42 +30,26 @@
         position: relative;
         cursor: pointer;
       }
-
       .white {
         background: #f0d9b5;
       }
-
       .black {
         background: #b58863;
       }
-
-      .piece {
-        user-select: none;
-        cursor: grab;
-      }
-
-      .piece:active {
-        cursor: grabbing;
-      }
-
       .piece-white {
         color: white;
         -webkit-text-stroke: 1px black;
       }
-
       .piece-black {
         color: black;
         -webkit-text-stroke: 1px white;
       }
-
       .selected {
         outline: 3px solid yellow;
       }
-
       .square.drag-over {
         outline: 3px solid yellow;
       }
-
       .file {
         position: absolute;
         bottom: 2px;
@@ -76,7 +57,6 @@
         font-size: 11px;
         opacity: 0.7;
       }
-
       .rank {
         position: absolute;
         top: 2px;
@@ -84,15 +64,12 @@
         font-size: 11px;
         opacity: 0.7;
       }
-
       #resetBtn {
         margin-top: 20px;
         padding: 10px 20px;
         font-size: 16px;
         cursor: pointer;
       }
-
-      /* Promotion UI */
       .promotion {
         position: fixed;
         top: 50%;
@@ -102,15 +79,13 @@
         padding: 15px;
         border-radius: 8px;
         display: none;
-        z-index: 100;
+        z-index: 10;
       }
-
       .promotion button {
         font-size: 30px;
         margin: 5px;
         cursor: pointer;
       }
-
       footer {
         margin-top: auto;
         padding: 15px 0;
@@ -119,19 +94,15 @@
       }
     </style>
   </head>
-
   <body>
     <h1>Chess</h1>
-
     <div class="board" id="board"></div>
     <button id="resetBtn">Reset Game</button>
-
     <div class="promotion" id="promotion"></div>
-
-    <footer>&copy; Copyright 2025 Lucas</footer>
+    <footer>&copy; 2025 Lucas</footer>
 
     <script>
-      const boardElement = document.getElementById("board");
+      const boardEl = document.getElementById("board");
       const promotionEl = document.getElementById("promotion");
 
       const figures = {
@@ -165,7 +136,7 @@
       let promotionTarget = null;
 
       function drawBoard() {
-        boardElement.innerHTML = "";
+        boardEl.innerHTML = "";
 
         for (let row = 0; row < 8; row++) {
           for (let col = 0; col < 8; col++) {
@@ -176,22 +147,23 @@
             square.dataset.row = row;
             square.dataset.col = col;
 
-            square.onclick = () => handleMove(row, col);
+            square.onclick = () => handleClick(row, col);
 
+            // Drag-over and drop for drag-and-drop
             square.ondragover = (e) => {
               e.preventDefault();
               square.classList.add("drag-over");
             };
-
-            square.ondragleave = () => square.classList.remove("drag-over");
-
+            square.ondragleave = () => {
+              square.classList.remove("drag-over");
+            };
             square.ondrop = (e) => {
               e.preventDefault();
               square.classList.remove("drag-over");
               const from = e.dataTransfer.getData("text");
               if (!from) return;
-              const [r, c] = from.split(",").map(Number);
-              movePiece(r, c, row, col);
+              const [fr, fc] = from.split(",").map(Number);
+              movePiece(fr, fc, row, col);
             };
 
             const piece = board[row][col];
@@ -201,15 +173,23 @@
               pieceEl.className =
                 "piece " +
                 (piece === piece.toUpperCase() ? "piece-white" : "piece-black");
-              pieceEl.draggable = true;
-              pieceEl.ondragstart = (e) =>
+              pieceEl.draggable = !promotionTarget;
+
+              // Drag start: store position and hide element to prevent ghost
+              pieceEl.ondragstart = (e) => {
                 e.dataTransfer.setData("text", `${row},${col}`);
+                setTimeout(() => (pieceEl.style.display = "none"), 0);
+              };
+              pieceEl.ondragend = () => {
+                pieceEl.style.display = "block";
+                drawBoard();
+              };
+
               square.appendChild(pieceEl);
             }
 
-            if (selected && selected.row === row && selected.col === col) {
+            if (selected && selected.row === row && selected.col === col)
               square.classList.add("selected");
-            }
 
             if (row === 7) {
               const file = document.createElement("div");
@@ -217,7 +197,6 @@
               file.textContent = String.fromCharCode(97 + col);
               square.appendChild(file);
             }
-
             if (col === 0) {
               const rank = document.createElement("div");
               rank.className = "rank";
@@ -225,22 +204,52 @@
               square.appendChild(rank);
             }
 
-            boardElement.appendChild(square);
+            boardEl.appendChild(square);
           }
         }
       }
 
-      function handleMove(row, col) {
+      function handleClick(row, col) {
+        if (promotionTarget) return;
+
+        const clickedPiece = board[row][col];
+
         if (selected) {
+          if (
+            clickedPiece &&
+            isSameColor(board[selected.row][selected.col], clickedPiece)
+          ) {
+            // Click your own piece to select it
+            selected = { row, col };
+            drawBoard();
+            return;
+          }
           movePiece(selected.row, selected.col, row, col);
-        } else if (board[row][col]) {
+        } else if (clickedPiece) {
           selected = { row, col };
           drawBoard();
         }
       }
 
+      function isSameColor(piece1, piece2) {
+        if (!piece1 || !piece2) return false;
+        return (
+          (piece1 === piece1.toUpperCase()) ===
+          (piece2 === piece2.toUpperCase())
+        );
+      }
+
       function movePiece(fr, fc, tr, tc) {
-        board[tr][tc] = board[fr][fc];
+        const movingPiece = board[fr][fc];
+        const targetPiece = board[tr][tc];
+
+        if (targetPiece && isSameColor(movingPiece, targetPiece)) {
+          selected = null;
+          drawBoard();
+          return;
+        }
+
+        board[tr][tc] = movingPiece;
         board[fr][fc] = "";
         selected = null;
         checkPromotion(tr, tc);
@@ -258,19 +267,17 @@
       function showPromotion() {
         promotionEl.innerHTML = "";
         promotionEl.style.display = "block";
-
         const pieces =
           promotionTarget.color === "white"
             ? ["Q", "R", "B", "N"]
             : ["q", "r", "b", "n"];
-
         pieces.forEach((p) => {
           const btn = document.createElement("button");
           btn.textContent = figures[p];
           btn.onclick = () => {
             board[promotionTarget.row][promotionTarget.col] = p;
-            promotionEl.style.display = "none";
             promotionTarget = null;
+            promotionEl.style.display = "none";
             drawBoard();
           };
           promotionEl.appendChild(btn);
@@ -280,6 +287,7 @@
       document.getElementById("resetBtn").onclick = () => {
         board = JSON.parse(JSON.stringify(initialBoard));
         selected = null;
+        promotionTarget = null;
         promotionEl.style.display = "none";
         drawBoard();
       };
