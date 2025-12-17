@@ -212,26 +212,31 @@
 
       function handleClick(row, col) {
         if (promotionTarget) return;
+
         const clickedPiece = board[row][col];
-        if (
-          clickedPiece &&
-          (currentTurn === "white") !==
-            (clickedPiece === clickedPiece.toUpperCase())
-        )
-          return;
+
+        // If a piece is already selected
         if (selected) {
-          if (
-            clickedPiece &&
-            isSameColor(board[selected.row][selected.col], clickedPiece)
-          ) {
+          const selectedPiece = board[selected.row][selected.col];
+
+          // If clicked another piece of the same color, just select it
+          if (clickedPiece && isSameColor(selectedPiece, clickedPiece)) {
             selected = { row, col };
             drawBoard();
             return;
           }
+
+          // Move the piece (handles capture automatically)
           movePiece(selected.row, selected.col, row, col);
         } else if (clickedPiece) {
-          selected = { row, col };
-          drawBoard();
+          // Select the piece only if it's the current player's turn
+          if (
+            (currentTurn === "white") ===
+            (clickedPiece === clickedPiece.toUpperCase())
+          ) {
+            selected = { row, col };
+            drawBoard();
+          }
         }
       }
 
