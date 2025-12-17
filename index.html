@@ -2,12 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Chess by Lucas</title>
+    <title>Chess - Full Rules</title>
     <style>
       body {
         background: #222;
         color: white;
-        font-family: Arial, sans-serif;
+        font-family: Arial;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -95,7 +95,7 @@
     </style>
   </head>
   <body>
-    <h1>Chess</h1>
+    <h1>Chess - Full Rules</h1>
     <div class="board" id="board"></div>
     <button id="resetBtn">Reset Game</button>
     <div class="promotion" id="promotion"></div>
@@ -134,10 +134,19 @@
       let board = JSON.parse(JSON.stringify(initialBoard));
       let selected = null;
       let promotionTarget = null;
+      let currentTurn = "white";
+      let enPassantTarget = null;
+      let hasMoved = {
+        K: false,
+        k: false,
+        R1: false,
+        R2: false,
+        r1: false,
+        r2: false,
+      };
 
       function drawBoard() {
         boardEl.innerHTML = "";
-
         for (let row = 0; row < 8; row++) {
           for (let col = 0; col < 8; col++) {
             const square = document.createElement("div");
@@ -146,10 +155,7 @@
             }`;
             square.dataset.row = row;
             square.dataset.col = col;
-
             square.onclick = () => handleClick(row, col);
-
-            // Drag-over and drop for drag-and-drop
             square.ondragover = (e) => {
               e.preventDefault();
               square.classList.add("drag-over");
@@ -165,7 +171,6 @@
               const [fr, fc] = from.split(",").map(Number);
               movePiece(fr, fc, row, col);
             };
-
             const piece = board[row][col];
             if (piece) {
               const pieceEl = document.createElement("div");
@@ -173,9 +178,9 @@
               pieceEl.className =
                 "piece " +
                 (piece === piece.toUpperCase() ? "piece-white" : "piece-black");
-              pieceEl.draggable = !promotionTarget;
-
-              // Drag start: store position and hide element to prevent ghost
+              pieceEl.draggable =
+                !promotionTarget &&
+                (currentTurn === "white") === (piece === piece.toUpperCase());
               pieceEl.ondragstart = (e) => {
                 e.dataTransfer.setData("text", `${row},${col}`);
                 setTimeout(() => (pieceEl.style.display = "none"), 0);
@@ -184,13 +189,10 @@
                 pieceEl.style.display = "block";
                 drawBoard();
               };
-
               square.appendChild(pieceEl);
             }
-
             if (selected && selected.row === row && selected.col === col)
               square.classList.add("selected");
-
             if (row === 7) {
               const file = document.createElement("div");
               file.className = "file";
@@ -203,7 +205,6 @@
               rank.textContent = 8 - row;
               square.appendChild(rank);
             }
-
             boardEl.appendChild(square);
           }
         }
@@ -211,15 +212,18 @@
 
       function handleClick(row, col) {
         if (promotionTarget) return;
-
         const clickedPiece = board[row][col];
-
+        if (
+          clickedPiece &&
+          (currentTurn === "white") !==
+            (clickedPiece === clickedPiece.toUpperCase())
+        )
+          return;
         if (selected) {
           if (
             clickedPiece &&
             isSameColor(board[selected.row][selected.col], clickedPiece)
           ) {
-            // Click your own piece to select it
             selected = { row, col };
             drawBoard();
             return;
@@ -231,29 +235,173 @@
         }
       }
 
-      function isSameColor(piece1, piece2) {
-        if (!piece1 || !piece2) return false;
-        return (
-          (piece1 === piece1.toUpperCase()) ===
-          (piece2 === piece2.toUpperCase())
-        );
+      function isSameColor(p1, p2) {
+        if (!p1 || !p2) return false;
+        return (p1 === p1.toUpperCase()) === (p2 === p2.toUpperCase());
       }
 
       function movePiece(fr, fc, tr, tc) {
         const movingPiece = board[fr][fc];
         const targetPiece = board[tr][tc];
-
         if (targetPiece && isSameColor(movingPiece, targetPiece)) {
           selected = null;
           drawBoard();
           return;
         }
+        if (!isMoveLegal(movingPiece, fr, fc, tr, tc)) {
+          selected = null;
+          drawBoard();
+          return;
+        }
 
+        // ---------------- CASTLING: king moves two squares ----------------
+        if (movingPiece.toUpperCase() === "K" && Math.abs(tc - fc) === 2) {
+          const isWhite = movingPiece === "K";
+          const row = fr;
+          if (tc > fc) {
+            // kingside
+            const rookCol = 7;
+            if (
+              !hasMoved[movingPiece] &&
+              !hasMoved[isWhite ? "R2" : "r2"] &&
+              !board[row][fc + 1] &&
+              !board[row][fc + 2]
+            ) {
+              board[row][fc + 1] = isWhite ? "R" : "r";
+              board[row][rookCol] = "";
+              hasMoved[movingPiece] = true;
+              hasMoved[isWhite ? "R2" : "r2"] = true;
+            }
+          } else {
+            // queenside
+            const rookCol = 0;
+            if (
+              !hasMoved[movingPiece] &&
+              !hasMoved[isWhite ? "R1" : "r1"] &&
+              !board[row][fc - 1] &&
+              !board[row][fc - 2] &&
+              !board[row][fc - 3]
+            ) {
+              board[row][fc - 1] = isWhite ? "R" : "r";
+              board[row][rookCol] = "";
+              hasMoved[movingPiece] = true;
+              hasMoved[isWhite ? "R1" : "r1"] = true;
+            }
+          }
+        }
+
+        // ---------------- EN PASSANT ----------------
+        if (movingPiece.toUpperCase() === "P" && !targetPiece && fc !== tc) {
+          if (
+            enPassantTarget &&
+            enPassantTarget.row === tr &&
+            enPassantTarget.col === tc
+          ) {
+            board[fr][tc] = "";
+          }
+        }
+
+        // ---------------- NORMAL MOVE ----------------
         board[tr][tc] = movingPiece;
         board[fr][fc] = "";
+        if (movingPiece === "K") hasMoved["K"] = true;
+        if (movingPiece === "k") hasMoved["k"] = true;
+        if (movingPiece === "R" && fr === 7 && fc === 0) hasMoved["R1"] = true;
+        if (movingPiece === "R" && fr === 7 && fc === 7) hasMoved["R2"] = true;
+        if (movingPiece === "r" && fr === 0 && fc === 0) hasMoved["r1"] = true;
+        if (movingPiece === "r" && fr === 0 && fc === 7) hasMoved["r2"] = true;
+
+        if (movingPiece === "P" && fr === 6 && tr === 4)
+          enPassantTarget = { row: 5, col: fc };
+        else if (movingPiece === "p" && fr === 1 && tr === 3)
+          enPassantTarget = { row: 2, col: fc };
+        else enPassantTarget = null;
+
         selected = null;
         checkPromotion(tr, tc);
         drawBoard();
+        switchTurn();
+      }
+
+      function switchTurn() {
+        currentTurn = currentTurn === "white" ? "black" : "white";
+      }
+
+      function isMoveLegal(piece, fr, fc, tr, tc) {
+        const dr = tr - fr,
+          dc = tc - fc;
+        if (piece === "P") {
+          if (dc === 0 && dr === -1 && !board[tr][tc]) return true;
+          if (
+            dc === 0 &&
+            dr === -2 &&
+            fr === 6 &&
+            !board[tr][tc] &&
+            !board[fr - 1][fc]
+          )
+            return true;
+          if (
+            Math.abs(dc) === 1 &&
+            dr === -1 &&
+            ((board[tr][tc] && !isSameColor(piece, board[tr][tc])) ||
+              (enPassantTarget &&
+                enPassantTarget.row === tr &&
+                enPassantTarget.col === tc))
+          )
+            return true;
+          return false;
+        }
+        if (piece === "p") {
+          if (dc === 0 && dr === 1 && !board[tr][tc]) return true;
+          if (
+            dc === 0 &&
+            dr === 2 &&
+            fr === 1 &&
+            !board[tr][tc] &&
+            !board[fr + 1][fc]
+          )
+            return true;
+          if (
+            Math.abs(dc) === 1 &&
+            dr === 1 &&
+            ((board[tr][tc] && !isSameColor(piece, board[tr][tc])) ||
+              (enPassantTarget &&
+                enPassantTarget.row === tr &&
+                enPassantTarget.col === tc))
+          )
+            return true;
+          return false;
+        }
+        if (piece.toUpperCase() === "N")
+          return (
+            (Math.abs(dr) === 2 && Math.abs(dc) === 1) ||
+            (Math.abs(dr) === 1 && Math.abs(dc) === 2)
+          );
+        if (piece.toUpperCase() === "K")
+          return (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) || Math.abs(dc) === 2; // allow castling
+        if (piece.toUpperCase() === "R")
+          return (dr === 0 || dc === 0) && isPathClear(fr, fc, tr, tc);
+        if (piece.toUpperCase() === "B")
+          return Math.abs(dr) === Math.abs(dc) && isPathClear(fr, fc, tr, tc);
+        if (piece.toUpperCase() === "Q")
+          return (
+            (dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) &&
+            isPathClear(fr, fc, tr, tc)
+          );
+        return false;
+      }
+
+      function isPathClear(fr, fc, tr, tc) {
+        const dr = Math.sign(tr - fr),
+          dc = Math.sign(tc - fc);
+        let r = fr + dr,
+          c = fc + dc;
+        while (r !== tr || c !== tc) {
+          if (board[r][c]) return false;
+          r += dr;
+          c += dc;
+        }
+        return true;
       }
 
       function checkPromotion(row, col) {
@@ -288,6 +436,16 @@
         board = JSON.parse(JSON.stringify(initialBoard));
         selected = null;
         promotionTarget = null;
+        currentTurn = "white";
+        enPassantTarget = null;
+        hasMoved = {
+          K: false,
+          k: false,
+          R1: false,
+          R2: false,
+          r1: false,
+          r2: false,
+        };
         promotionEl.style.display = "none";
         drawBoard();
       };
